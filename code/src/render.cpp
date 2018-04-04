@@ -25,6 +25,8 @@ extern void renderPrims();
 extern void cleanupPrims();
 ////////////////
 
+
+
 namespace RenderVars {
 	const float FOV = glm::radians(65.f);
 	const float zNear = 1.f;
