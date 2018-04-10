@@ -4,6 +4,17 @@
 #include <iostream>
 
 using v3 = glm::vec3;
+float eCo=0.5;
+float fCo=0.5;
+#define NPARTICLES 1
+#define MASS 1.f//F
+struct particle {
+	v3 P;
+	v3 Po;
+	v3 V;
+	v3 Vo;
+	v3 F;
+};
 
 //PLANOS
 const glm::vec3 planes[6] = {
@@ -24,6 +35,8 @@ const glm::vec3 planePoint[6]{
 	{ 0, 5, 5 }
 };
 
+float arrayParticles[NPARTICLES * 3];
+particle arrayStructParticles[NPARTICLES];
 
 //COLISIONES PLANO
 float planeD(glm::vec3 normal, glm::vec3 puntoP) {
@@ -38,16 +51,16 @@ void rebote(particle &particula, glm::vec3 normal, glm::vec3 planeSpot) {
 	normal = glm::normalize(normal);
 	float d = planeD(normal, planeSpot);
 
-	particula.Po -= (1 + GUIvars::eCo) * (glm::dot(normal, particula.Po) + d)*normal;
+	particula.Po -= (1 + eCo) * (glm::dot(normal, particula.Po) + d)*normal;
 
-	particula.P -= (1 + GUIvars::eCo) * (glm::dot(normal, particula.P) + d)*normal;
+	particula.P -= (1 + eCo) * (glm::dot(normal, particula.P) + d)*normal;
 
-	particula.V = particula.V - (1 + GUIvars::eCo) * glm::dot(normal, particula.V)*normal;
+	particula.V = particula.V - (1 + eCo) * glm::dot(normal, particula.V)*normal;
 
 	glm::vec3 velocidadNormal = glm::dot(normal, particula.Vo)*normal;
 	glm::vec3 velocidadTangencial = particula.Vo - velocidadNormal;
 
-	particula.V -= GUIvars::fCo*velocidadTangencial;
+	particula.V -= fCo*velocidadTangencial;
 }
 
 
