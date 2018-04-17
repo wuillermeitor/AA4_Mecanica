@@ -5,27 +5,37 @@
 #include <stdlib.h>
 #include <time.h>
 #include <glm/gtc/quaternion.hpp>
+#include <deque>
 
 #define GRAVEDAD -9.81f
 float impulsoInicial = 250.f;
 
 using v3 = glm::vec3;
 using m4 = glm::mat4;
+using m3 = glm::mat3;
+
+struct Force {
+	v3 puntAp;
+	v3 power;
+};
 
 namespace Cube {
 	extern void setupCube();
 	extern void cleanupCube();
 	extern void updateCube(const glm::mat4& transform);
 	extern void drawCube();
-
-	m4 matrix;
+	extern const float halfW;
+	m4 orientation;
 
 	v3 pos;
-	m4 orientation;
+	m3 iBody;
+	m3 impulso;
 	v3 vel;
+	v3 velA;
 	v3 linM;
 	v3 angM;
-	v3 sumF;
+	std::deque<Force> sumF;
+	v3 torque;
 	float mass;
 }
 
@@ -118,26 +128,44 @@ void GUI() {
 	}
 }
 
+void applyForce(Force f) {
+	Cube::sumF.push_back(f);
+}
+
 void myUpdateCube(float dt){
-	Cube::sumF = { 0, GRAVEDAD + impulsoInicial, 0 };
+	Cube::sumF.push_back({ Cube::pos, {0, GRAVEDAD, 0} });
 
-	Cube::linM += dt*Cube::sumF;
-
+	for (std::deque<Force>::iterator i = Cube::sumF.begin(); i != Cube::sumF.end(); ++i) {
+		Cube::linM += dt*i->power;
+		Cube::torque = glm::distance(i->puntAp, Cube::pos)*i->power;
+	}
+	
 	Cube::vel = Cube::linM / Cube::mass;
 	Cube::pos = Cube::pos + Cube::vel * dt;	
 
-	Cube::matrix={	1, 0, 0, 0,
+	Cube::angM += dt*Cube::torque;
+
+	m4 temp(glm::inverse(Cube::iBody));
+	
+	Cube::impulso = Cube::orientation*(temp)*glm::transpose(Cube::orientation);
+	Cube::velA = Cube::impulso*Cube::angM;
+
+	Cube::iBody += dt*(Cube::iBody*Cube::velA);//FALLA ESTO, REESCRIBIR LA VELOCIDAD ANGULAR COMO UNA MATRIX
+
+	Cube::orientation ={	1, 0, 0, 0,
 					0, 1, 0, 0,
 					0, 0, 1, 0,
 					Cube::pos.x, Cube::pos.y, Cube::pos.z, 1 };
-	impulsoInicial = 0;
+
+	Cube::orientation *= m4(glm::transpose(Cube::iBody));
+
+	Cube::sumF.clear();
+	Cube::sumF.shrink_to_fit();
 }
 
 void PhysicsInit() {
 	srand(time(NULL));
 	Cube::mass = 1.f;
-
-	Cube::sumF = { 0, -9.81+10, 0 };
 
 	Cube::linM = { 0, 0, 0 };
 	Cube::angM = { 0, 0, 0 };
@@ -145,14 +173,13 @@ void PhysicsInit() {
 	Cube::vel = { 0, 0, 0 };
 	Cube::pos = { getRandBetweenFloats(-5, 5), getRandBetweenFloats(0, 10), getRandBetweenFloats(-5, 5) };
 
-	Cube::orientation = {	1, 0, 0, 0,
-							0, 1, 0, 0,
-							0, 0, 1, 0,
-							0, 0, 0, 1	};
+	Cube::iBody = {	1/12*Cube::mass*(glm::pow(Cube::halfW*2, 2) + glm::pow(Cube::halfW * 2, 2)), 0, 0, //CAMBIAR NOMBRES
+							0, 1 / 12 * Cube::mass*(glm::pow(Cube::halfW * 2, 2) + glm::pow(Cube::halfW * 2, 2)), 0,
+							0, 0, 1 / 12 * Cube::mass*(glm::pow(Cube::halfW * 2, 2) + glm::pow(Cube::halfW * 2, 2))};
 	//Cube::vel = { 0, 0, 0 };
 	//Cube::velO = { 0, 0, 0 };
 
-	Cube::matrix = {1, 0, 0, 0,
+	Cube::orientation = {1, 0, 0, 0,
 					0, 1, 0, 0,
 					0, 0, 1, 0,
 					Cube::pos.x, Cube::pos.y, Cube::pos.z, 1 };
@@ -162,7 +189,7 @@ void PhysicsInit() {
 
 void PhysicsUpdate(float dt) {
 	myUpdateCube(dt);
-	Cube::updateCube(Cube::matrix);
+	Cube::updateCube(Cube::orientation);
 	Cube::drawCube();
 	
 	UV::currentTime += dt;
