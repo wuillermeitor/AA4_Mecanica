@@ -133,11 +133,11 @@ void applyForce(Force f) {
 }
 
 void myUpdateCube(float dt){
-	Cube::sumF.push_back({ Cube::pos, {0, GRAVEDAD, 0} });
+	Cube::sumF.push_back({ Cube::pos, {0, 0, 0} });
 
 	for (std::deque<Force>::iterator i = Cube::sumF.begin(); i != Cube::sumF.end(); ++i) {
 		Cube::linM += dt*i->power;
-		Cube::torque = glm::distance(i->puntAp, Cube::pos)*i->power;
+		Cube::torque = glm::cross((i->puntAp - Cube::pos),i->power);
 	}
 	
 	Cube::vel = Cube::linM / Cube::mass;
@@ -148,16 +148,15 @@ void myUpdateCube(float dt){
 	m4 temp(glm::inverse(Cube::iBody));
 	
 	Cube::impulso = Cube::orientation*(temp)*glm::transpose(Cube::orientation);
+
 	Cube::velA = Cube::impulso*Cube::angM;
 
-	Cube::iBody += dt*(Cube::iBody*Cube::velA);//FALLA ESTO, REESCRIBIR LA VELOCIDAD ANGULAR COMO UNA MATRIX
+	v3 ass = dt*((Cube::velA)*m3(Cube::orientation));
+	
+	Cube::orientation += glm::vec4(ass, 1);
 
-	Cube::orientation ={	1, 0, 0, 0,
-					0, 1, 0, 0,
-					0, 0, 1, 0,
-					Cube::pos.x, Cube::pos.y, Cube::pos.z, 1 };
-
-	Cube::orientation *= m4(glm::transpose(Cube::iBody));
+	//m4 tempVelA();
+	//Cube::iBody += dt*(Cube::iBody*Cube::velA);//FALLA ESTO, REESCRIBIR LA VELOCIDAD ANGULAR COMO UNA MATRIX
 
 	Cube::sumF.clear();
 	Cube::sumF.shrink_to_fit();
@@ -173,23 +172,30 @@ void PhysicsInit() {
 	Cube::vel = { 0, 0, 0 };
 	Cube::pos = { getRandBetweenFloats(-5, 5), getRandBetweenFloats(0, 10), getRandBetweenFloats(-5, 5) };
 
-	Cube::iBody = {	1/12*Cube::mass*(glm::pow(Cube::halfW*2, 2) + glm::pow(Cube::halfW * 2, 2)), 0, 0, //CAMBIAR NOMBRES
-							0, 1 / 12 * Cube::mass*(glm::pow(Cube::halfW * 2, 2) + glm::pow(Cube::halfW * 2, 2)), 0,
-							0, 0, 1 / 12 * Cube::mass*(glm::pow(Cube::halfW * 2, 2) + glm::pow(Cube::halfW * 2, 2))};
+	Cube::iBody = {	1.f/12.f*Cube::mass*(glm::pow(Cube::halfW*2, 2) + glm::pow(Cube::halfW * 2, 2)), 0, 0, //CAMBIAR NOMBRES
+							0, 1.f / 12.f * Cube::mass*(glm::pow(Cube::halfW * 2, 2) + glm::pow(Cube::halfW * 2, 2)), 0,
+							0, 0, 1.f / 12.f * Cube::mass*(glm::pow(Cube::halfW * 2, 2) + glm::pow(Cube::halfW * 2, 2))};
 	//Cube::vel = { 0, 0, 0 };
 	//Cube::velO = { 0, 0, 0 };
 
-	Cube::orientation = {1, 0, 0, 0,
-					0, 1, 0, 0,
-					0, 0, 1, 0,
-					Cube::pos.x, Cube::pos.y, Cube::pos.z, 1 };
+	Cube::orientation = {	1, 0, 0, 0,
+							0, 1, 0, 0,
+							0, 0, 1, 0,
+							0, 0, 0, 1 };
 
 	Cube::setupCube();
 }
 
 void PhysicsUpdate(float dt) {
 	myUpdateCube(dt);
-	Cube::updateCube(Cube::orientation);
+
+	m4 pos = {	1, 0, 0, 0,
+				0, 1, 0, 0,
+				0, 0, 1, 0,
+				Cube::pos.x, Cube::pos.y, Cube::pos.z, 1 };
+
+	Cube::updateCube(pos*glm::transpose(Cube::orientation));
+	std::cout << Cube::pos.y << std::endl;
 	Cube::drawCube();
 	
 	UV::currentTime += dt;
