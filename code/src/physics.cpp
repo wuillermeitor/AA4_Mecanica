@@ -37,6 +37,11 @@ namespace Cube {
 	std::deque<Force> sumF;
 	v3 torque;
 	float mass;
+
+	extern glm::vec3 verts[];
+	v3 boxNorms[6]{
+
+	};
 }
 
 namespace UV {
@@ -132,6 +137,10 @@ void applyForce(Force f) {
 	Cube::sumF.push_back(f);
 }
 
+bool isOutOfCube(v3 myVec) {
+
+}
+
 void myUpdateCube(float dt){
 	Cube::sumF.push_back({ Cube::pos, {0, GRAVEDAD, 0} });
 
@@ -153,6 +162,10 @@ void myUpdateCube(float dt){
 
 	Cube::sumF.clear();
 	Cube::sumF.shrink_to_fit();
+
+	for (int i = 0; i < 8; ++i) {
+		Cube::verts[i];
+	}
 }
 
 void PhysicsInit() {
