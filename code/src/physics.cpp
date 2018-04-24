@@ -137,13 +137,11 @@ void myUpdateCube(float dt){
 
 	for (std::deque<Force>::iterator i = Cube::sumF.begin(); i != Cube::sumF.end(); ++i) {
 		Cube::linM += dt*i->power;
-		Cube::torque = glm::cross(glm::abs(i->puntAp - Cube::pos),i->power);
 	}
-	
 	Cube::vel = Cube::linM / Cube::mass;
 	Cube::pos = Cube::pos + Cube::vel * dt;	
 
-	Cube::angM += dt*Cube::torque;
+	Cube::angM = dt*Cube::torque;
 
 	glm::mat3 or = glm::mat3_cast(Cube::orientation);
 	Cube::impulso = or*(glm::inverse(Cube::iBody))*glm::transpose(or);
@@ -152,9 +150,6 @@ void myUpdateCube(float dt){
 
 	Cube::orientation += dt*(0.5f * glm::quat(0.f, Cube::velA)* Cube::orientation);
 	Cube::orientation = glm::normalize(Cube::orientation);
-
-	//m4 tempVelA();
-	//Cube::iBody += dt*(Cube::iBody*Cube::velA);//FALLA ESTO, REESCRIBIR LA VELOCIDAD ANGULAR COMO UNA MATRIX
 
 	Cube::sumF.clear();
 	Cube::sumF.shrink_to_fit();
@@ -170,15 +165,21 @@ void PhysicsInit() {
 	Cube::vel = { 0, 0, 0 };
 	getRandBetweenFloats(-900, 900);
 	Cube::pos = { getRandBetweenFloats(-5, 5), getRandBetweenFloats(0, 10), getRandBetweenFloats(-5, 5) }; //LOS RANDOM VAN MAL
-	std::cout << Cube::pos.x << " " << Cube::pos.y << " " << Cube::pos.z << std::endl;
 	Cube::iBody = {	1.f/12.f*Cube::mass*(glm::pow(Cube::halfW*2, 2) + glm::pow(Cube::halfW * 2, 2)), 0, 0, //CAMBIAR NOMBRES
 							0, 1.f / 12.f * Cube::mass*(glm::pow(Cube::halfW * 2, 2) + glm::pow(Cube::halfW * 2, 2)), 0,
 							0, 0, 1.f / 12.f * Cube::mass*(glm::pow(Cube::halfW * 2, 2) + glm::pow(Cube::halfW * 2, 2))};
-	//Cube::vel = { 0, 0, 0 };
-	//Cube::velO = { 0, 0, 0 };
+	
 
+	applyForce({ Cube::pos + v3{ 0.065, 0.065, 0.065 } ,{ 0, 300, 0 } });
+	applyForce({ Cube::pos ,{ 0, 30000000, 0 } });
+	
+	Cube::torque = glm::cross(Cube::sumF.begin()->puntAp - Cube::pos, Cube::sumF.begin()->power);
 
-	applyForce({ Cube::pos + v3{0, 0.25, 0} ,{ 150, 400, 200 } });
+	std::cout << "torque: " << std::endl;
+	std::cout << Cube::torque.x << " " << Cube::torque.y << " " << Cube::torque.z << " " << std::endl;
+	Cube::sumF.clear();
+	applyForce({ Cube::pos ,{ 0, 123.456789, 0 } });
+
 	Cube::setupCube();
 }
 
