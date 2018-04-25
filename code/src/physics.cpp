@@ -27,11 +27,15 @@ namespace Cube {
 	extern const float halfW;
 	
 	glm::quat orientation;
+	glm::quat orientationO;
 	v3 pos;
+	v3 posO;
 	m3 iBody;
 	m3 impulso;
 	v3 vel;
+	v3 velO;
 	v3 velA;
+	v3 velAO;
 	v3 linM;
 	v3 angM;
 	std::deque<Force> sumF;
@@ -71,21 +75,31 @@ const glm::vec3 planes[6] = {
 };
 
 const glm::vec3 planePoint[6]{
-	{ 0, 0, 0 },
-	{ 0, 10, 0 },
-	{ -5, 5, 0 },
-	{ 5, 5, 0 },
-	{ 0, 5, -5 },
-	{ 0, 5, 5 }
+	{ 0, 0, 0 }, //BOT
+	{ 0, 10, 0 }, //TOP
+	{ -5, 5, 0 }, //LEFT
+	{ 5, 5, 0 }, //RIGHT
+	{ 0, 5, -5 }, //BACK
+	{ 0, 5, 5 }	//FRONT
 };
 
 //COLISIONES PLANO
-float planeD(glm::vec3 normal, glm::vec3 puntoP) {
+float planeD(v3 normal, v3 puntoP) {
 	return -glm::dot(normal, puntoP);
 }
 
-bool hasCollided(particle particula, glm::vec3 normal, float d) {
-	return ((glm::dot(normal, particula.Po) + d)*(glm::dot(normal, particula.P) + d) <= 0);
+bool hasCollided(v3 location, v3 locationO, v3 normal, float d) {
+	return ((glm::dot(normal, locationO) + d)*(glm::dot(normal, location) + d) <= 0);
+}
+
+std::pair<bool, int> isOutOfCube() {
+	for (int i = 0; i < 6; ++i) {
+		for (int j = 0; j < 8; ++j) {
+			if (hasCollided(Cube::pos + Cube::verts[j], Cube::posO + Cube::verts[j], planes[i], planeD(planes[i], planePoint[i])))
+				return std::make_pair(true, j);
+		}
+	}
+	return std::make_pair(false, -1);
 }
 
 void rebote(particle &particula, glm::vec3 normal, glm::vec3 planeSpot) {
@@ -137,8 +151,9 @@ void applyForce(Force f) {
 	Cube::sumF.push_back(f);
 }
 
-bool isOutOfCube(v3 myVec) {
+void bolzano(double dt, float obj) {
 
+	bolzano(dt / 2, obj);
 }
 
 void myUpdateCube(float dt){
@@ -147,7 +162,9 @@ void myUpdateCube(float dt){
 	for (std::deque<Force>::iterator i = Cube::sumF.begin(); i != Cube::sumF.end(); ++i) {
 		Cube::linM += dt*i->power;
 	}
+	Cube::velO = Cube::vel;
 	Cube::vel = Cube::linM / Cube::mass;
+	Cube::posO = Cube::pos;
 	Cube::pos = Cube::pos + Cube::vel * dt;	
 
 	Cube::angM = dt*Cube::torque;
@@ -155,8 +172,10 @@ void myUpdateCube(float dt){
 	glm::mat3 or = glm::mat3_cast(Cube::orientation);
 	Cube::impulso = or*(glm::inverse(Cube::iBody))*glm::transpose(or);
 
+	Cube::velAO = Cube::velA;
 	Cube::velA = Cube::impulso*Cube::angM;
 
+	Cube::orientationO = Cube::orientation;
 	Cube::orientation += dt*(0.5f * glm::quat(0.f, Cube::velA)* Cube::orientation);
 	Cube::orientation = glm::normalize(Cube::orientation);
 
@@ -165,6 +184,28 @@ void myUpdateCube(float dt){
 
 	for (int i = 0; i < 8; ++i) {
 		Cube::verts[i];
+	}
+	std::pair<bool, int> myPair = isOutOfCube();
+	if(myPair.first){
+		Cube::vel = Cube::velO;
+		Cube::velA = Cube::velAO;
+		Cube::pos = Cube::posO;
+		Cube::orientation = Cube::orientationO;
+
+		switch (myPair.second) {//Los cases son los mismos 2 a 2, porque los que nos importa es la coordenada, en función del plano (top y bot, y), (left y right, x), (front y back, z)
+		case 0:
+		case 1:
+			bolzano(dt / 2, planes[myPair.second].y);
+			break;
+		case 2:
+		case 3:
+			bolzano(dt / 2, planes[myPair.second].x);
+			break;
+		case 4:
+		case 5:
+			bolzano(dt / 2, planes[myPair.second].z);
+			break;
+		}
 	}
 }
 
