@@ -156,6 +156,26 @@ void bolzano(double dt, float obj) {
 	bolzano(dt / 2, obj);
 }
 
+//float Bolzano(float t0, float t) {
+//	float mitad = t0 + (t - t0) / 2;
+//	float margen = 0.001;
+//		if (t - t0 > margen) {
+//			if (isOutOfCube()) { //Per poder aplicar bolzano Outofcube o HasCollided hauria de rebre un temps com a parametre
+//				t = Bolzano(t0, mitad);
+//			}
+//			else {
+//				t0 = Bolzano(mitad, t);
+//			}
+//		}
+//
+//	if (t - t0 <= margen) {
+//		return t;
+//	}
+//	else {
+//		return mitad;
+//	}
+//}
+
 void myUpdateCube(float dt){
 	Cube::sumF.push_back({ Cube::pos, {0, GRAVEDAD, 0} });
 
