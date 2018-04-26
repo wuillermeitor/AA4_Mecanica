@@ -9,6 +9,8 @@
 
 #define GRAVEDAD -9.81f
 float impulsoInicial = 250.f;
+const float margen = 0.001;
+static int controller = 0;
 
 using v3 = glm::vec3;
 using m4 = glm::mat4;
@@ -95,7 +97,9 @@ bool hasCollided(v3 location, v3 locationO, v3 normal, float d) {
 std::pair<bool, std::pair<int, int>> isOutOfCube() { //no devuelve el vértice con el que choca
 	for (int i = 0; i < 6; ++i) {
 		for (int j = 0; j < 8; ++j) {
-			if (hasCollided(Cube::pos + Cube::verts[j], Cube::posO + Cube::verts[j], planes[i], planeD(planes[i], planePoint[i])))
+			v3 aux = Cube::pos + (glm::mat3_cast(Cube::orientation)*Cube::verts[j]);
+			v3 aux1 = Cube::posO + (glm::mat3_cast(Cube::orientation)*Cube::verts[j]);
+			if (hasCollided(Cube::pos + (glm::mat3_cast(Cube::orientation)*Cube::verts[j]), Cube::posO + (glm::mat3_cast(Cube::orientation)*Cube::verts[j]), planes[i], planeD(planes[i], planePoint[i])))
 				return std::make_pair(true, std::make_pair(j, i));
 		}
 	}
@@ -151,30 +155,34 @@ void applyForce(Force f) {
 	Cube::sumF.push_back(f);
 }
 
-float bolzano(float dtO, float dtF, v3 planeNormal, v3 planePoint, char coord, int collidingVert) {
+float bolzano(float dtO, float dtF, v3 planeN, v3 planeP, char coord, int collidingVert) {
 	
-	v3 localCubePos = Cube::pos + Cube::vel * dtF; //posición del cubo en el "siguiente frame"
+	controller++;
+
+	v3 CubePos = Cube::pos + Cube::vel * ((dtF+dtO)/2.f); //posición del cubo en el "siguiente frame"
+	CubePos += (glm::mat3_cast(Cube::orientation)*Cube::verts[collidingVert]); //la posición del vértice que está chocando
+
 	float localCoord, localPlaneCoord;
 	switch (coord) {
-	case 'x': localCoord = localCubePos.x;
-		localPlaneCoord = planeNormal.x;
+	case 'x': localCoord = CubePos.x;
+		localPlaneCoord = planeP.x;
 		break;
-	case 'y': localCoord = localCubePos.y;
-		localPlaneCoord = planeNormal.y;
+	case 'y': localCoord = CubePos.y;
+		localPlaneCoord = planeP.y;
 		break;
-	case 'z': localCoord = localCubePos.z;
-		localPlaneCoord = planeNormal.z;
+	case 'z': localCoord = CubePos.z;
+		localPlaneCoord = planeP.z;
 		break;
 	}
-	float margen = 0.01;
+	
 
-	if (localCoord < localPlaneCoord+planePoint[collidingVert] + margen || localCoord < localPlaneCoord + planePoint[collidingVert] - margen)
+	if (((localCoord>localPlaneCoord-margen) && (localCoord<localPlaneCoord+margen))||controller>=10)
 		return dtF;
 	else {
-		if (hasCollided(localCubePos, Cube::posO, planeNormal, planeD(planeNormal, planePoint)))
-			return bolzano(dtF / 2, dtF, planeNormal, planePoint, coord, collidingVert);
+		if (hasCollided(CubePos, Cube::posO, planeN, planeD(planeN, planeP)))
+			return bolzano(dtO, (dtF+dtO)/2.f, planeN, planeP, coord, collidingVert);
 		else
-			return bolzano(dtO , dtF/2, planeNormal, planePoint, coord, collidingVert);
+			return bolzano((dtF+dtO)/2.f , dtF, planeN, planeP, coord, collidingVert);
 	}
 }
 
@@ -213,22 +221,64 @@ void myUpdateCube(float dt){
 		Cube::velA = Cube::velAO;
 		Cube::pos = Cube::posO;
 		Cube::orientation = Cube::orientationO;
-		float print;
-		switch (myPair.second.first) {//Los cases son los mismos 2 a 2, porque los que nos importa es la coordenada, en función del plano (top y bot, y), (left y right, x), (front y back, z)
+		float accurateDT;
+		switch (myPair.second.second) {//Los cases son los mismos 2 a 2, porque los que nos importa es la coordenada, en función del plano (top y bot, y), (left y right, x), (front y back, z)
 		case 0:
 		case 1:
-			print = bolzano(0, dt, planes[myPair.second.first], planePoint[myPair.second.first], 'y', myPair.second.second);
+			accurateDT = bolzano(0, dt, planes[myPair.second.second], planePoint[myPair.second.second], 'y', myPair.second.first);
 			break;
 		case 2:
 		case 3:
-			print = bolzano(0, dt, planes[myPair.second.first], planePoint[myPair.second.first], 'x', myPair.second.second);
+			accurateDT = bolzano(0, dt, planes[myPair.second.second], planePoint[myPair.second.second], 'x', myPair.second.first);
 			break;
 		case 4:
 		case 5:
-			print = bolzano(0, dt, planes[myPair.second.first], planePoint[myPair.second.first], 'z', myPair.second.second);
+			accurateDT = bolzano(0, dt, planes[myPair.second.second], planePoint[myPair.second.second], 'z', myPair.second.first);
 			break;
 		}
-		std::cout << print << std::endl;
+		//A PARTIR DE AQUI TODO ES SUSCEPTIBLE DE IR MAL
+		controller = 0;
+		Cube::sumF.push_back({ Cube::pos,{ 0, GRAVEDAD, 0 } });
+
+		//calculamos el momento lineal con el accurateDT y con este la velocidad lineal
+		for (std::deque<Force>::iterator i = Cube::sumF.begin(); i != Cube::sumF.end(); ++i) {
+			Cube::linM += accurateDT * i->power;
+		}
+		Cube::vel = Cube::linM / Cube::mass;
+
+		//calculamos el momento angular con el accurateDT y con este la velocidad angular
+		glm::mat3 localOr = glm::mat3_cast(Cube::orientation);
+		Cube::impulso = localOr *(glm::inverse(Cube::iBody))*glm::transpose(or );
+		Cube::angM = accurateDT * Cube::torque;
+		Cube::velA = Cube::impulso*Cube::angM;
+
+		//calculamos la posición del centro de masas con el accurateDT 
+		Cube::pos = Cube::pos + Cube::vel * accurateDT;
+		v3 puntCol = Cube::pos + (glm::mat3_cast(Cube::orientation)*Cube::verts[myPair.second.first]);
+
+		v3 pa = glm::cross(Cube::vel + Cube::velA, (puntCol-Cube::pos));
+		v3 pb = glm::cross(v3(0, 0, 0)+v3(0, 0, 0), (puntCol-planePoint[myPair.second.second]));
+
+		float vrel = glm::dot(planes[myPair.second.second], (pa - pb));
+
+		if (vrel > 0) {//se están separando
+
+		}
+		else if (vrel < margen && vrel>-margen) {//están reposando el uno sobre el otro
+
+		}
+		else if (vrel < 0) {//se están chocando
+			std::cout << "CHOQUE" << std::endl;
+			float e = 1;
+			float j = -(1 + e)*vrel;
+			v3 ra = Cube::pos;
+			v3 rb = planePoint[myPair.second.second]; //lo de abajo es la mega formula, he obviado lo que dará 0
+			j /= ((1/Cube::mass)+1/(INT_MAX)+ glm::dot(planes[myPair.second.second], glm::cross((glm::inverse(Cube::iBody))*(glm::cross(ra, planes[myPair.second.second])),ra)));
+			v3 imp = glm::cross(ra, j * planes[myPair.second.second]);
+
+			Cube::linM = -Cube::linM + j * planes[myPair.second.second];
+			Cube::angM = -Cube::angM + imp;
+		}
 	}
 }
 
@@ -269,7 +319,11 @@ void PhysicsUpdate(float dt) {
 
 	Cube::updateCube(pos*glm::mat4_cast(Cube::orientation));
 	Cube::drawCube();
-	
+	std::pair<bool, std::pair<int, int>> myP = isOutOfCube();
+	/*if (myP.first) {
+		v3 collidingVert = Cube::pos + (glm::mat3_cast(Cube::orientation)*Cube::verts[myP.second.first]);
+		std::cout << collidingVert.x << " " << collidingVert.y << " " << collidingVert.z << " " << std::endl;
+	}*/
 	UV::currentTime += dt;
 }
 
