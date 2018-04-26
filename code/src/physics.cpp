@@ -92,14 +92,14 @@ bool hasCollided(v3 location, v3 locationO, v3 normal, float d) {
 	return ((glm::dot(normal, locationO) + d)*(glm::dot(normal, location) + d) <= 0);
 }
 
-std::pair<bool, int> isOutOfCube() {
+std::pair<bool, std::pair<int, int>> isOutOfCube() { //no devuelve el vértice con el que choca
 	for (int i = 0; i < 6; ++i) {
 		for (int j = 0; j < 8; ++j) {
 			if (hasCollided(Cube::pos + Cube::verts[j], Cube::posO + Cube::verts[j], planes[i], planeD(planes[i], planePoint[i])))
-				return std::make_pair(true, j);
+				return std::make_pair(true, std::make_pair(j, i));
 		}
 	}
-	return std::make_pair(false, -1);
+	return std::make_pair(false, std::make_pair(-1, -1));
 }
 
 void rebote(particle &particula, glm::vec3 normal, glm::vec3 planeSpot) {
@@ -151,30 +151,32 @@ void applyForce(Force f) {
 	Cube::sumF.push_back(f);
 }
 
-void bolzano(double dt, float obj) {
+float bolzano(float dtO, float dtF, v3 planeNormal, v3 planePoint, char coord, int collidingVert) {
+	
+	v3 localCubePos = Cube::pos + Cube::vel * dtF; //posición del cubo en el "siguiente frame"
+	float localCoord, localPlaneCoord;
+	switch (coord) {
+	case 'x': localCoord = localCubePos.x;
+		localPlaneCoord = planeNormal.x;
+		break;
+	case 'y': localCoord = localCubePos.y;
+		localPlaneCoord = planeNormal.y;
+		break;
+	case 'z': localCoord = localCubePos.z;
+		localPlaneCoord = planeNormal.z;
+		break;
+	}
+	float margen = 0.01;
 
-	bolzano(dt / 2, obj);
+	if (localCoord < localPlaneCoord+planePoint[collidingVert] + margen || localCoord < localPlaneCoord + planePoint[collidingVert] - margen)
+		return dtF;
+	else {
+		if (hasCollided(localCubePos, Cube::posO, planeNormal, planeD(planeNormal, planePoint)))
+			return bolzano(dtF / 2, dtF, planeNormal, planePoint, coord, collidingVert);
+		else
+			return bolzano(dtO , dtF/2, planeNormal, planePoint, coord, collidingVert);
+	}
 }
-
-//float Bolzano(float t0, float t) {
-//	float mitad = t0 + (t - t0) / 2;
-//	float margen = 0.001;
-//		if (t - t0 > margen) {
-//			if (isOutOfCube()) { //Per poder aplicar bolzano Outofcube o HasCollided hauria de rebre un temps com a parametre
-//				t = Bolzano(t0, mitad);
-//			}
-//			else {
-//				t0 = Bolzano(mitad, t);
-//			}
-//		}
-//
-//	if (t - t0 <= margen) {
-//		return t;
-//	}
-//	else {
-//		return mitad;
-//	}
-//}
 
 void myUpdateCube(float dt){
 	Cube::sumF.push_back({ Cube::pos, {0, GRAVEDAD, 0} });
@@ -205,27 +207,28 @@ void myUpdateCube(float dt){
 	for (int i = 0; i < 8; ++i) {
 		Cube::verts[i];
 	}
-	std::pair<bool, int> myPair = isOutOfCube();
+	std::pair<bool, std::pair<int, int>> myPair = isOutOfCube();
 	if(myPair.first){
 		Cube::vel = Cube::velO;
 		Cube::velA = Cube::velAO;
 		Cube::pos = Cube::posO;
 		Cube::orientation = Cube::orientationO;
-
-		switch (myPair.second) {//Los cases son los mismos 2 a 2, porque los que nos importa es la coordenada, en función del plano (top y bot, y), (left y right, x), (front y back, z)
+		float print;
+		switch (myPair.second.first) {//Los cases son los mismos 2 a 2, porque los que nos importa es la coordenada, en función del plano (top y bot, y), (left y right, x), (front y back, z)
 		case 0:
 		case 1:
-			bolzano(dt / 2, planes[myPair.second].y);
+			print = bolzano(0, dt, planes[myPair.second.first], planePoint[myPair.second.first], 'y', myPair.second.second);
 			break;
 		case 2:
 		case 3:
-			bolzano(dt / 2, planes[myPair.second].x);
+			print = bolzano(0, dt, planes[myPair.second.first], planePoint[myPair.second.first], 'x', myPair.second.second);
 			break;
 		case 4:
 		case 5:
-			bolzano(dt / 2, planes[myPair.second].z);
+			print = bolzano(0, dt, planes[myPair.second.first], planePoint[myPair.second.first], 'z', myPair.second.second);
 			break;
 		}
+		std::cout << print << std::endl;
 	}
 }
 
